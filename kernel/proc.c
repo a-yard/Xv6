@@ -20,7 +20,7 @@ static void wakeup1(struct proc *chan);
 static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
-
+//extern void get_uused_proc(uint64 * dst);
 // initialize the proc table at boot time.
 void
 procinit(void)
@@ -294,7 +294,8 @@ fork(void)
   pid = np->pid;
 
   np->state = RUNNABLE;
-
+  np->umask = p->umask;
+  np->if_trace = p->if_trace;
   release(&np->lock);
 
   return pid;
@@ -692,4 +693,14 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+void procnum(uint64 *dst){
+    *dst = 0;
+    struct proc * p;
+    for(p = proc;p<&proc[NPROC];p++){
+      if(p->state!=UNUSED)
+          (*dst)++;
+    }
+
 }
