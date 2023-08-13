@@ -93,7 +93,10 @@ static struct proc*
 allocproc(void)
 {
   struct proc *p;
-
+  pagetable_t* pagetable;
+  pagetable = u_vm_init();
+  p->kpagetable=pagetable;
+  
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
@@ -102,6 +105,7 @@ allocproc(void)
       release(&p->lock);
     }
   }
+  
   return 0;
 
 found:
