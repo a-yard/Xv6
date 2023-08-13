@@ -93,10 +93,8 @@ static struct proc*
 allocproc(void)
 {
   struct proc *p;
-  pagetable_t* pagetable;
-  pagetable = u_vm_init();
-  p->kpagetable=pagetable;
   
+
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
@@ -130,7 +128,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  pagetable_t pagetable;
+  pagetable = u_vm_init();
+  p->kpagetable=pagetable;
   return p;
 }
 
