@@ -131,8 +131,48 @@ found:
   pagetable_t pagetable;
   pagetable = u_vm_init();
   p->kpagetable=pagetable;
+
+  // struct proc *init_p;
+  
+  // initlock(&pid_lock, "nextpid");
+  // for(init_p= proc; init_p< &proc[NPROC]; init_p++) {
+  //     initlock(&init_p->lock, "proc");
+
+  //     // Allocate a page for the process's kernel stack.
+  //     // Map it high in memory, followed by an invalid
+  //     // guard page.
+  //     char *pa = kalloc();
+  //     if(pa == 0)
+  //       panic("kalloc");
+  //     uint64 va = KSTACK((int) (init_p- proc));
+  //     kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  //     init_p->kstack = va;
+  // }
+  // kvminithart();
   return p;
 }
+
+// void
+// procinit(void)
+// {
+//   struct proc *p;
+  
+//   initlock(&pid_lock, "nextpid");
+//   for(p = proc; p < &proc[NPROC]; p++) {
+//       initlock(&p->lock, "proc");
+
+//       // Allocate a page for the process's kernel stack.
+//       // Map it high in memory, followed by an invalid
+//       // guard page.
+//       char *pa = kalloc();
+//       if(pa == 0)
+//         panic("kalloc");
+//       uint64 va = KSTACK((int) (p - proc));
+//       kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+//       p->kstack = va;
+//   }
+//   kvminithart();
+// }
 
 // free a proc structure and the data hanging from it,
 // including user pages.
@@ -482,7 +522,8 @@ scheduler(void)
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
-
+        //tmp
+        //c->proc->pagetable = p->kpagetable;
         found = 1;
       }
       release(&p->lock);
