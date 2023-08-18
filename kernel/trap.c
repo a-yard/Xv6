@@ -62,7 +62,7 @@ usertrap(void)
 
     // an interrupt will change sstatus &c registers,
     // so don't enable until done with those registers.
-    intr_on();
+    intr_on();//xv6启动中断
 
     syscall();
   } else if((which_dev = devintr()) != 0){

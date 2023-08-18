@@ -5,7 +5,26 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h" 
+#include "proc.h"
 
+
+void free_user_kpagetable(pagetable_t kernelpt){
+    // similar to the freewalk method
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = kernelpt[i];
+    if(pte & PTE_V){
+      kernelpt[i] = 0;
+      if ((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        uint64 child = PTE2PA(pte);
+        free_user_kpagetable((pagetable_t)child);
+      }
+    }
+  }
+  kfree((void*)kernelpt);
+
+}
 /*
  * the kernel's page table.
  */
@@ -49,30 +68,16 @@ kvminit(void)
   
 }
 pagetable_t u_vm_init(void){
-  pagetable_t pagetable = (pagetable_t) kalloc();
-  memset(pagetable, 0, PGSIZE);
-   // uart registers
-  uvmmap(pagetable,UART0, UART0, PGSIZE, PTE_R | PTE_W);
-  
-  // virtio mmio disk interface
-  uvmmap(pagetable,VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
-  
-  // CLINT
-  uvmmap(pagetable,CLINT, CLINT, 0x10000, PTE_R | PTE_W);
-  
-  // PLIC
-  uvmmap(pagetable,PLIC, PLIC, 0x400000, PTE_R | PTE_W);
-
-  // map kernel text executable and read-only.
-  uvmmap(pagetable,KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
-
-  // map kernel data and the physical RAM we'll make use of.
-  uvmmap(pagetable,(uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
-
-  // map the trampoline for trap entry/exit to
-  // the highest virtual address in the kernel.
-  uvmmap(pagetable,TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
-  return pagetable;
+  pagetable_t kernelpt = uvmcreate();
+  if (kernelpt == 0) return 0;
+  uvmmap(kernelpt, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+  uvmmap(kernelpt, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+  uvmmap(kernelpt, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+  uvmmap(kernelpt, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+  uvmmap(kernelpt, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+  uvmmap(kernelpt, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+  uvmmap(kernelpt, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+  return kernelpt;
 }
 // Switch h/w page table register to the kernel's page table,
 // and enable paging.
@@ -83,6 +88,10 @@ kvminithart()
   sfence_vma();
 }
 
+void my_kvminithart(pagetable_t pagetable){
+  w_satp(MAKE_SATP(pagetable));
+  sfence_vma();
+}
 // Return the address of the PTE in page table pagetable
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page-table pages.
@@ -150,7 +159,7 @@ kvmmap(uint64 va, uint64 pa, uint64 sz, int perm)
 
 void uvmmap(pagetable_t pagetable,uint64 va, uint64 pa, uint64 sz, int perm){
   if(mappages(pagetable, va, sz, pa, perm) != 0)
-    panic("Uvmmap");
+    panic("myUvmmap");
 }
 // translate a kernel virtual address to
 // a physical address. only needed for
@@ -163,7 +172,7 @@ kvmpa(uint64 va)
   pte_t *pte;
   uint64 pa;
   
-  pte = walk(kernel_pagetable, va, 0);
+  pte = walk(myproc()->kpagetable, va, 0);
   if(pte == 0)
     panic("kvmpa");
   if((*pte & PTE_V) == 0)
@@ -476,7 +485,7 @@ void vmprint(pagetable_t pt){
   printf("page table %p\n",pt);
   for(int i=0;i<512;i++){
     pte_t pte1 = pt[i];
-    if(pte1&1){
+    if(pte1&PTE_V){
       pte_t child1;
       child1 = PTE2PA(pte1);
       
@@ -484,14 +493,14 @@ void vmprint(pagetable_t pt){
       pagetable_t pt1 = (pagetable_t)child1;
       for(int j=0;j<512;j++){
         pte_t pte2 = pt1[j];
-        if(pte2&1){
+        if(pte2&PTE_V){
           pte_t child2;
           child2 = PTE2PA(pte2);
           printf(".. ..%d: pte %p pa %p\n",j,pte2,child2);
           pagetable_t pt2 = (pagetable_t)child2;
           for(int h=0;h<512;h++){
             pte_t pte3 = pt2[h];
-            if(pte3&1){
+            if(pte3&PTE_V){
               pte_t child3;
               child3 = PTE2PA(pte3);
               child3 += (uint64)((uint64)pt<<52)>>52;
@@ -502,8 +511,26 @@ void vmprint(pagetable_t pt){
       }
     }
   }
-  //allocproc();
+ 
 }
+
+// void
+// freewalk(pagetable_t pagetable)
+// {
+//   // there are 2^9 = 512 PTEs in a page table.
+//   for(int i = 0; i < 512; i++){
+//     pte_t pte = pagetable[i];
+//     if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+//       // this PTE points to a lower-level page table.
+//       uint64 child = PTE2PA(pte);
+//       freewalk((pagetable_t)child);
+//       pagetable[i] = 0;
+//     } else if(pte & PTE_V){
+//       panic("freewalk: leaf");
+//     }
+//   }
+//   kfree((void*)pagetable);
+// }
 
 
 

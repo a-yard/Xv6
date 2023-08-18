@@ -159,6 +159,8 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+void free_user_kpagetable(pagetable_t pagetable);
+void my_kvminithart(pagetable_t pagetable);
 void            kvminit(void);
 pagetable_t u_vm_init(void);
 void            kvminithart(void);
