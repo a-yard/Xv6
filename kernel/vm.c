@@ -9,21 +9,22 @@
 #include "proc.h"
 
 
-void free_user_kpagetable(pagetable_t kernelpt){
-    // similar to the freewalk method
-  // there are 2^9 = 512 PTEs in a page table.
-  for(int i = 0; i < 512; i++){
-    pte_t pte = kernelpt[i];
-    if(pte & PTE_V){
-      kernelpt[i] = 0;
-      if ((pte & (PTE_R|PTE_W|PTE_X)) == 0){
-        uint64 child = PTE2PA(pte);
-        free_user_kpagetable((pagetable_t)child);
+void free_user_kpagetable(pagetable_t pagetable){
+  pte_t p;
+  
+  for(int i=0;i<512;i++){
+    p = pagetable[i];
+    if(p&PTE_V){
+      pagetable[i]=0;
+      if((p&(PTE_R|PTE_W|PTE_X))==0){
+        pagetable_t child;
+        child = (pagetable_t)PTE2PA(p);
+        free_user_kpagetable(child);
       }
+      //pagetable[i]=0;
     }
   }
-  kfree((void*)kernelpt);
-
+  kfree((void*)pagetable);
 }
 /*
  * the kernel's page table.
