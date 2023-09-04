@@ -159,6 +159,9 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+int copyin_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len);
+int copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max);
+void u2kvmcopy(pagetable_t u_pagetable,pagetable_t k_pagetable,uint64 oldsz,uint64 newsz);
 void free_user_kpagetable(pagetable_t pagetable);
 void my_kvminithart(pagetable_t pagetable);
 void            kvminit(void);

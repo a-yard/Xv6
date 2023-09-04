@@ -116,8 +116,11 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     if(*pte & PTE_V) {
       pagetable = (pagetable_t)PTE2PA(*pte);
     } else {
-      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
+      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0){
+        //printf("fdsfs");
         return 0;
+      }
+        
       memset(pagetable, 0, PGSIZE);
       *pte = PA2PTE(pagetable) | PTE_V;
     }
@@ -125,6 +128,23 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
   return &pagetable[PX(0, va)];
 }
 
+void u2kvmcopy(pagetable_t u_pagetable,pagetable_t k_pagetable,uint64 oldsz,uint64 newsz){
+  pte_t * pte_from;
+  pte_t * pte_to;
+  for(uint64 i=oldsz ; i < newsz - PGSIZE; i+=PGSIZE){
+    pte_from = walk(u_pagetable,i,0);
+    if(pte_from==0){
+      panic("error1");
+    }
+    pte_to = walk(k_pagetable,i,1);
+    if(pte_to==0){
+      panic("error2");
+    }
+    uint64 pa = PTE2PA(*pte_from);
+    uint flags = (PTE_FLAGS(*pte_from))&(~PTE_U);
+    *pte_to = PA2PTE(pa)|flags;
+  }
+}
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
@@ -420,23 +440,23 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
+  // uint64 n, va0, pa0;
 
-  while(len > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > len)
-      n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+  // while(len > 0){
+  //   va0 = PGROUNDDOWN(srcva);
+  //   pa0 = walkaddr(pagetable, va0);
+  //   if(pa0 == 0)
+  //     return -1;
+  //   n = PGSIZE - (srcva - va0);
+  //   if(n > len)
+  //     n = len;
+  //   memmove(dst, (void *)(pa0 + (srcva - va0)), n);
 
-    len -= n;
-    dst += n;
-    srcva = va0 + PGSIZE;
-  }
-  return 0;
+  //   len -= n;
+  //   dst += n;
+  //   srcva = va0 + PGSIZE;
+  // }
+  return copyin_new(myproc()->kpagetable, dst,srcva,len);//0;
 }
 
 // Copy a null-terminated string from user to kernel.

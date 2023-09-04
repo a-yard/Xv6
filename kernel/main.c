@@ -26,9 +26,11 @@ main()
     trapinit();      // trap vectors
     trapinithart();  // install kernel trap vector
     plicinit();      // set up interrupt controller
+   // printf("jjkk\n");
     plicinithart();  // ask PLIC for device interrupts
-    binit();         // buffer cache
+    binit();         // buffer cach
     iinit();         // inode cache
+    //printf("sdsad\n");
     fileinit();      // file table
     virtio_disk_init(); // emulated hard disk
 #ifdef LAB_NET
