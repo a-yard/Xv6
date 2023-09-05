@@ -307,8 +307,12 @@ int growproc(int n)
   {
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
+   if(p->sz<=PLIC)
+    u2kvmcopy(p->pagetable,p->kpagetable,p->sz,sz);
+  else
+    panic("p->sz too much");
   p->sz = sz;
-  u2kvmcopy(p->pagetable,p->kpagetable,0,p->sz);
+ 
   return 0;
 }
 
@@ -352,7 +356,7 @@ int fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
-  u2kvmcopy(p->pagetable,p->kpagetable,0,p->sz);
+  u2kvmcopy(np->pagetable,np->kpagetable,0,np->sz);
   np->state = RUNNABLE;
   
   release(&np->lock);
