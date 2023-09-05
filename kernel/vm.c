@@ -128,23 +128,38 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
   return &pagetable[PX(0, va)];
 }
 
-void u2kvmcopy(pagetable_t u_pagetable,pagetable_t k_pagetable,uint64 oldsz,uint64 newsz){
-  pte_t * pte_from;
-  pte_t * pte_to;
-  for(uint64 i=oldsz ; i < newsz - PGSIZE; i+=PGSIZE){
-    pte_from = walk(u_pagetable,i,0);
-    if(pte_from==0){
-      panic("error1");
-    }
-    pte_to = walk(k_pagetable,i,1);
-    if(pte_to==0){
-      panic("error2");
-    }
+void
+u2kvmcopy(pagetable_t pagetable, pagetable_t kernelpt, uint64 oldsz, uint64 newsz){
+  pte_t *pte_from, *pte_to;
+  oldsz = PGROUNDUP(oldsz);
+  for (uint64 i = oldsz; i < newsz; i += PGSIZE){
+    if((pte_from = walk(pagetable, i, 0)) == 0)
+      panic("u2kvmcopy: src pte does not exist");
+    if((pte_to = walk(kernelpt, i, 1)) == 0)
+      panic("u2kvmcopy: pte walk failed");
     uint64 pa = PTE2PA(*pte_from);
-    uint flags = (PTE_FLAGS(*pte_from))&(~PTE_U);
-    *pte_to = PA2PTE(pa)|flags;
+    uint flags = (PTE_FLAGS(*pte_from)) & (~PTE_U);
+    *pte_to = PA2PTE(pa) | flags;
   }
 }
+
+// void u2kvmcopy(pagetable_t u_pagetable,pagetable_t k_pagetable,uint64 oldsz,uint64 newsz){
+//   pte_t * pte_from;
+//   pte_t * pte_to;
+//   for(uint64 i=oldsz ; i < newsz - PGSIZE; i+=PGSIZE){
+//     pte_from = walk(u_pagetable,i,0);
+//     if(pte_from==0){
+//       panic("error1");
+//     }
+//     pte_to = walk(k_pagetable,i,1);
+//     if(pte_to==0){
+//       panic("error2");
+//     }
+//     uint64 pa = PTE2PA(*pte_from);
+//     uint flags = (PTE_FLAGS(*pte_from))&(~PTE_U);
+//     *pte_to = PA2PTE(pa)|flags;
+//   }
+// }
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
@@ -456,7 +471,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
   //   dst += n;
   //   srcva = va0 + PGSIZE;
   // }
-  return copyin_new(myproc()->kpagetable, dst,srcva,len);//0;
+  return copyin_new(pagetable, dst,srcva,len);//0;
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -535,23 +550,6 @@ void vmprint(pagetable_t pt){
  
 }
 
-// void
-// freewalk(pagetable_t pagetable)
-// {
-//   // there are 2^9 = 512 PTEs in a page table.
-//   for(int i = 0; i < 512; i++){
-//     pte_t pte = pagetable[i];
-//     if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
-//       // this PTE points to a lower-level page table.
-//       uint64 child = PTE2PA(pte);
-//       freewalk((pagetable_t)child);
-//       pagetable[i] = 0;
-//     } else if(pte & PTE_V){
-//       panic("freewalk: leaf");
-//     }
-//   }
-//   kfree((void*)pagetable);
-// }
 
 
 
