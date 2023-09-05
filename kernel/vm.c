@@ -517,37 +517,65 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-void vmprint(pagetable_t pt){
-  printf("page table %p\n",pt);
-  for(int i=0;i<512;i++){
-    pte_t pte1 = pt[i];
-    if(pte1&PTE_V){
-      pte_t child1;
-      child1 = PTE2PA(pte1);
+// void vmprint(pagetable_t pt){
+//   printf("page table %p\n",pt);
+//   for(int i=0;i<512;i++){
+//     pte_t pte1 = pt[i];
+//     if(pte1&PTE_V){
+//       pte_t child1;
+//       child1 = PTE2PA(pte1);
       
-      printf("..%d: pte %p pa %p\n",i,pte1,child1);
-      pagetable_t pt1 = (pagetable_t)child1;
-      for(int j=0;j<512;j++){
-        pte_t pte2 = pt1[j];
-        if(pte2&PTE_V){
-          pte_t child2;
-          child2 = PTE2PA(pte2);
-          printf(".. ..%d: pte %p pa %p\n",j,pte2,child2);
-          pagetable_t pt2 = (pagetable_t)child2;
-          for(int h=0;h<512;h++){
-            pte_t pte3 = pt2[h];
-            if(pte3&PTE_V){
-              pte_t child3;
-              child3 = PTE2PA(pte3);
-              child3 += (uint64)((uint64)pt<<52)>>52;
-              printf(".. .. ..%d: pte %p pa %p\n",h,pte3,child3);
-            }
-          }
-        }
+//       printf("..%d: pte %p pa %p\n",i,pte1,child1);
+//       pagetable_t pt1 = (pagetable_t)child1;
+//       for(int j=0;j<512;j++){
+//         pte_t pte2 = pt1[j];
+//         if(pte2&PTE_V){
+//           pte_t child2;
+//           child2 = PTE2PA(pte2);
+//           printf(".. ..%d: pte %p pa %p\n",j,pte2,child2);
+//           pagetable_t pt2 = (pagetable_t)child2;
+//           for(int h=0;h<512;h++){
+//             pte_t pte3 = pt2[h];
+//             if(pte3&PTE_V){
+//               pte_t child3;
+//               child3 = PTE2PA(pte3);
+//               child3 += (uint64)((uint64)pt<<52)>>52;
+//               printf(".. .. ..%d: pte %p pa %p\n",h,pte3,child3);
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+ 
+// }
+
+
+void
+_vmprint(pagetable_t pagetable, int level){
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    // PTE_V is a flag for whether the page table is valid
+    if(pte & PTE_V){
+      for (int j = 0; j < level; j++){
+        if (j) printf(" ");
+        printf("..");
+      }
+      uint64 child = PTE2PA(pte);
+      printf("%d: pte %p pa %p\n", i, pte, child);
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        // this PTE points to a lower-level page table.
+        _vmprint((pagetable_t)child, level + 1);
       }
     }
   }
- 
+}
+
+void
+vmprint(pagetable_t pagetable){
+  printf("page table %p\n", pagetable);
+  _vmprint(pagetable, 1);
 }
 
 

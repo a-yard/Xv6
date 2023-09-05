@@ -284,7 +284,6 @@ void userinit(void)
   p->cwd = namei("/");
   u2kvmcopy(p->pagetable,p->kpagetable,0,p->sz);  
   p->state = RUNNABLE;
-
   release(&p->lock);
 }
 
